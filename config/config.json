@@ -1,0 +1,20 @@
+{
+    "seed": 0,
+    "inference": false,
+    "wandb_project_name": "nlp-project1",
+    "wandb_username": "jayhwang-cloud",
+    "model_name": ["klue/roberta-small"],
+    "model_detail": ["v"],
+    "resume": false,
+    "batch_size": [16, 32],
+    "max_epoch": [2, 3],
+    "shuffle": true,
+    "learning_rate": [1e-5],
+    "data_dir": "./data",
+    "output_dir": "./outputs",
+    "model_dir": "./saves",
+    "train_path": "train.csv",
+    "dev_path": "dev.csv",
+    "test_path": "dev.csv",
+    "predict_path": "test.csv"
+}
