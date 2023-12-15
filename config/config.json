@@ -10,7 +10,7 @@
     "max_epoch": [20],
     "shuffle": true,
     "learning_rate": [1e-5],
-    "kfold": 5,
+    "kfold": 1,
     "data_dir": "./data",
     "output_dir": "./outputs",
     "model_dir": "./saves",

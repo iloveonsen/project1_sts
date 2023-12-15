@@ -19,6 +19,10 @@ class Model(pl.LightningModule):
         self.plm = transformers.AutoModelForSequenceClassification.from_pretrained(
             pretrained_model_name_or_path=model_name, num_labels=1
         )
+        
+        # # special token의 embedding을 학습에 포함시킵니다.
+        # self.plm.resize_token_embeddings(len(self.plm.tokenizer)) 
+
         # Loss 계산을 위해 사용될 L1Loss를 호출합니다.
         self.loss_func = torch.nn.L1Loss()
 

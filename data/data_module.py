@@ -49,6 +49,21 @@ class Dataloader(pl.LightningDataModule):
         self.predict_dataset = None
 
         self.tokenizer = transformers.AutoTokenizer.from_pretrained(model_name, max_length=160)
+
+        # source에 해당하는 special token
+        special_tokens_dict = {
+            "additional_special_tokens": [
+                "[petition]",
+                "[nsmc]",
+                "[slack]",
+                "[sampled]",
+                "[rtt]",
+            ]
+        }
+
+        self.tokenizer.add_special_tokens(special_tokens_dict)
+        # self.len_vocab=len(self.tokenizer) # 토큰의 갯수를 증가한만큼 update
+
         self.target_columns = ['label']
         self.delete_columns = ['id']
         self.text_columns = ['sentence_1', 'sentence_2']
@@ -56,8 +71,10 @@ class Dataloader(pl.LightningDataModule):
     def tokenizing(self, dataframe):
         data = []
         for idx, item in tqdm(dataframe.iterrows(), desc='tokenizing', total=len(dataframe)):
+            # source 토큰을 문장의 어디에 붙일 것인가? 맨 앞에 붙입니다.
+            src_tokens = [f"[{src}]" for src in item['source'].split("-")]
             # 두 입력 문장을 [SEP] 토큰으로 이어붙여서 전처리합니다.
-            text = '[SEP]'.join([item[text_column] for text_column in self.text_columns])
+            text = ''.join(src_tokens) + '[SEP]'.join([item[text_column] for text_column in self.text_columns])
             outputs = self.tokenizer(text, add_special_tokens=True, padding='max_length', truncation=True)
             for key in outputs:
                 outputs[key] = torch.tensor(outputs[key], dtype=torch.long)

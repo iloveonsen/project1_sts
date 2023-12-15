@@ -140,6 +140,13 @@ def main(config: Dict):
                 else:
                     dataloader = Dataloader(model_name, batch_size, args.shuffle, train_path, dev_path, test_path, predict_path)
 
+                    # print(f"Dataset tokenizer vocab size: {len(dataloader.tokenizer)}")
+                    # print(f"Model tokenizer vocab size: {model.plm.get_input_embeddings().num_embeddings}")
+                    
+                    # special token의 embedding을 학습에 포함시킵니다.
+                    model.plm.resize_token_embeddings(len(dataloader.tokenizer)) 
+                    # print(f"Aftrer updating Model tokenizer vocab size: {model.plm.get_input_embeddings().num_embeddings}")
+
                     # gpu가 없으면 accelerator="cpu"로 변경해주세요, gpu가 여러개면 'devices=4'처럼 사용하실 gpu의 개수를 입력해주세요
                     trainer = pl.Trainer(accelerator="gpu", devices=1, max_epochs=max_epoch, 
                                          callbacks=[checkpoint_callback,early_stop_custom_callback],
