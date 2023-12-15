@@ -6,7 +6,7 @@
 
 ```json
 {
-    "seed": 0,
+    "seed": 1784,
     "inference": false,
     "wandb_project_name": "<your-wandb-project-name>",
     "wandb_username": "<your-wandb-user-name>",
@@ -17,6 +17,7 @@
     "max_epoch": [5, 10, 15],
     "shuffle": true,
     "learning_rate": [1e-5, 5e-5],
+    "kfold": 5,
     "data_dir": "./data",
     "output_dir": "./outputs",
     "model_dir": "./saves",
@@ -29,6 +30,8 @@
 - `model_name` 의 list 에 원하는 모델을 추가가능합니다.
 - `model_detail` 의 경우 `model_name` 와 같은 인덱스에 대응해야 합니다.
 - `batch_size`, `max_epoch`, `learning_rate` 에 명시된 각 원소들을 조합하여 모든 combination 에 대해 모델을 실행합니다.
+- `kfold` 값을 1보다 크게 설정한 경우 cross-validation 으로 학습합니다.
+  - 이때 각 fold 당 학습횟수는 `max_epoch // kfold` 입니다.
 
 `python run.py` 로 training, `python run.py --inference=true` 로 inference 해주시면 실행됩니다.
 
