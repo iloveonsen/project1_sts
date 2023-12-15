@@ -5,6 +5,7 @@ from typing import Optional, List, Dict, Tuple
 from pathlib import Path
 from datetime import datetime
 from itertools import product
+import os
 
 import pandas as pd
 
@@ -24,6 +25,7 @@ from utils.utils import *
 from models.model import *
 from data.data_module import *
 
+os.environ["TZ"] = "Asia/Seoul"
 
 def main(config: Dict):
     # seed 고정
@@ -46,6 +48,7 @@ def main(config: Dict):
     parser.add_argument('--max_epoch', default=config["max_epoch"], type=int)
     parser.add_argument('--shuffle', default=config["shuffle"], type=bool)
     parser.add_argument('--learning_rate', default=config["learning_rate"], type=float)
+    parser.add_argument('--kfold', default=config["kfold"], type=int)
     parser.add_argument('--data_dir', default=config["data_dir"])
     parser.add_argument('--model_dir', default=config["model_dir"])
     parser.add_argument('--output_dir', default=config["output_dir"])
@@ -75,7 +78,7 @@ def main(config: Dict):
             for i, combination in enumerate(grids, start=1):
                 batch_size, max_epoch, learning_rate = combination
                 
-                print(f"#{i}" + "=" * 100)
+                print(f"#{i}" + "=" * 80)
                 print(f"model_name: {model_name}, model_detail: {model_detail}\nbatch_size: {batch_size}\nmax_epoch: {max_epoch}\nlearning_rate: {learning_rate}\n")
                 latest_version, _ = get_latest_version(args.model_dir, model_name)
 
@@ -85,10 +88,8 @@ def main(config: Dict):
                 print(f"save_name: {save_name}")
                 wandb_logger = WandbLogger(project=args.wandb_project_name, entity=args.wandb_username)
 
-                # dataloader와 model을 생성합니다.
-                dataloader = Dataloader(model_name, batch_size, args.shuffle, train_path, dev_path, test_path, predict_path)
-
-                early_stop_custom_callback = EarlyStopping("val_pearson", patience=4, verbose=True, mode="max")
+                # model을 생성합니다.
+                early_stop_custom_callback = EarlyStopping("val_pearson", patience=3, verbose=True, mode="max")
 
                 model_provider = model_name.split("/")[0] # "klue"/roberta-large
                 dirpath = Path(args.model_dir) / model_provider
@@ -105,17 +106,51 @@ def main(config: Dict):
                     mode="max"
                 )
 
-                # gpu가 없으면 accelerator="cpu"로 변경해주세요, gpu가 여러개면 'devices=4'처럼 사용하실 gpu의 개수를 입력해주세요
-                trainer = pl.Trainer(accelerator="gpu", devices=1, max_epochs=max_epoch, 
-                                    callbacks=[checkpoint_callback,early_stop_custom_callback],
-                                    log_every_n_steps=1,logger=wandb_logger)
 
                 model = Model(model_name, learning_rate)
                 # model.load_state_dict(checkpoint['state_dict'])
 
-                # Train part
-                trainer.fit(model=model, datamodule=dataloader)
-                trainer.test(model=model, datamodule=dataloader)
+                num_folds = args.kfold
+                split_seed = config["seed"]
+                if num_folds > 1:
+                    print(f"KFold dataloader will be used. nums_folds: {num_folds}, split_seed: {split_seed}")
+                    results = []
+
+                    # nums_folds는 fold의 개수, k는 k번째 fold datamodule
+                    for k in range(num_folds):
+                        print(f"Current fold: {k}th fold" + "=" * 80)
+                        kfdataloader = SKFoldDataloader(model_name, batch_size, args.shuffle, train_path, dev_path, test_path, predict_path,
+                                                        k=k, split_seed=split_seed, num_splits=num_folds)
+                        kfdataloader.prepare_data()
+                        kfdataloader.setup()
+
+                        trainer = pl.Trainer(accelerator="gpu", devices=1, max_epochs=max_epoch//num_folds, 
+                                             callbacks=[checkpoint_callback,early_stop_custom_callback],
+                                             log_every_n_steps=1,logger=wandb_logger)
+
+                        trainer.fit(model=model, datamodule=kfdataloader)
+                        score = trainer.test(model=model, datamodule=kfdataloader)
+
+                        results.extend(score)
+
+                    result = [x['test_pearson'] for x in results]
+                    score = sum(result) / num_folds
+                    print(f"K fold Test score: {score}" + "=" * 80)
+
+                else:
+                    dataloader = Dataloader(model_name, batch_size, args.shuffle, train_path, dev_path, test_path, predict_path)
+
+                    # gpu가 없으면 accelerator="cpu"로 변경해주세요, gpu가 여러개면 'devices=4'처럼 사용하실 gpu의 개수를 입력해주세요
+                    trainer = pl.Trainer(accelerator="gpu", devices=1, max_epochs=max_epoch, 
+                                         callbacks=[checkpoint_callback,early_stop_custom_callback],
+                                         log_every_n_steps=1,logger=wandb_logger)
+
+                    # Train part
+                    trainer.fit(model=model, datamodule=dataloader)
+                    trainer.test(model=model, datamodule=dataloader)
+
+                # 학습이 완료된 모델을 저장합니다.
+                torch.save(model, dirpath / f"{save_name}.pt")
 
     else:
         print("Start inference...")
@@ -126,7 +161,7 @@ def main(config: Dict):
         latest_version, latest_version_path = get_latest_version(args.model_dir, model_name)
         batch_size = int(latest_version_path.stem.split("_")[-8])
         
-        print(f"#inference" + "=" * 100)
+        print(f"#inference" + "=" * 80)
         print(f"model_name: {model_name}\nbatch_size: {batch_size}\n")
         latest_version, _ = get_latest_version(args.model_dir, model_name)
 
