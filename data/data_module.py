@@ -51,6 +51,7 @@ class Dataloader(pl.LightningDataModule):
         self.tokenizer = transformers.AutoTokenizer.from_pretrained(model_name, max_length=160)
 
         # source에 해당하는 special token
+        # secial token 를 추가할때마다 model.py 의 self.plm.resize_token_embeddings(self.plm.get_input_embeddings().num_embeddings + {5}) 를 수정해줘야함
         special_tokens_dict = {
             "additional_special_tokens": [
                 "[petition]",
@@ -137,7 +138,7 @@ class Dataloader(pl.LightningDataModule):
 
 
 
-class SKFoldDataloader(pl.LightningDataModule):
+class KFoldDataloader(pl.LightningDataModule):
     def __init__(self, model_name, batch_size, shuffle, train_path, dev_path, test_path, predict_path, 
                  k: int = 1, split_seed: int = 42, num_splits: int = 5):
         super().__init__()
@@ -160,6 +161,20 @@ class SKFoldDataloader(pl.LightningDataModule):
         self.predict_dataset = None
 
         self.tokenizer = transformers.AutoTokenizer.from_pretrained(model_name, max_length=160)
+
+        # source에 해당하는 special token
+        special_tokens_dict = {
+            "additional_special_tokens": [
+                "[petition]",
+                "[nsmc]",
+                "[slack]",
+                "[sampled]",
+                "[rtt]",
+            ]
+        }
+
+        self.tokenizer.add_special_tokens(special_tokens_dict)
+
         self.target_columns = ['label']
         self.delete_columns = ['id']
         self.text_columns = ['sentence_1', 'sentence_2']
@@ -167,8 +182,10 @@ class SKFoldDataloader(pl.LightningDataModule):
     def tokenizing(self, dataframe):
         data = []
         for idx, item in tqdm(dataframe.iterrows(), desc='tokenizing', total=len(dataframe)):
+            # source 토큰을 문장의 어디에 붙일 것인가? 맨 앞에 붙입니다.
+            src_tokens = [f"[{src}]" for src in item['source'].split("-")]
             # 두 입력 문장을 [SEP] 토큰으로 이어붙여서 전처리합니다.
-            text = '[SEP]'.join([item[text_column] for text_column in self.text_columns])
+            text = ''.join(src_tokens) + '[SEP]'.join([item[text_column] for text_column in self.text_columns])
             outputs = self.tokenizer(text, add_special_tokens=True, padding='max_length', truncation=True)
             for key in outputs:
                 outputs[key] = torch.tensor(outputs[key], dtype=torch.long)
