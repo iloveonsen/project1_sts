@@ -11,6 +11,7 @@ ipynb/*
 wandb/
 saves/*
 outputs/*
+test_outputs/*
 
 # Additional
 .bash_history
