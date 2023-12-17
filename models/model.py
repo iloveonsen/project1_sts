@@ -97,7 +97,7 @@ class Model(pl.LightningModule):
 
         # Define the LR scheduler
         lr_scheduler = {
-            'scheduler': ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=3, verbose=True),
+            'scheduler': ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=4, verbose=True),
             'monitor': 'val_loss',  # Adjust this based on your validation metric
             'interval': 'epoch',
             'frequency': 1

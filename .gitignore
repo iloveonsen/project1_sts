@@ -12,6 +12,7 @@ wandb/
 saves/*
 outputs/*
 test_outputs/*
+bak/*
 
 # Additional
 .bash_history

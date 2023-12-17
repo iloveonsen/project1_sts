@@ -99,7 +99,7 @@ def main(config: Dict):
                 wandb_logger = WandbLogger(project=args.wandb_project_name, entity=args.wandb_username)
 
                 # model을 생성합니다.
-                early_stop_custom_callback = EarlyStopping("val_pearson", patience=3, verbose=True, mode="max")
+                early_stop_custom_callback = EarlyStopping("val_pearson", patience=5, verbose=True, mode="max")
 
                 model_provider = model_name.split("/")[0] # "klue"/roberta-large
                 dirpath = Path(args.model_dir) / model_provider

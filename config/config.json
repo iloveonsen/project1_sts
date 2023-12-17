@@ -5,7 +5,7 @@
     "test": false,
     "wandb_project_name": "nlp-project1",
     "wandb_username": "jayhwang-cloud",
-    "model_name": ["BM-K/KoSimCSE-roberta-multitask"],
+    "model_name": ["snunlp/KR-ELECTRA-discriminator"],
     "model_detail": ["v"],
     "resume": false,
     "batch_size": [16],
