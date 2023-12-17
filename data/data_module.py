@@ -28,8 +28,6 @@ class Dataset(torch.utils.data.Dataset):
         return len(self.inputs)
 
 
-
-
 class Dataloader(pl.LightningDataModule):
     def __init__(self, model_name, batch_size, shuffle, train_path, dev_path, test_path, predict_path):
         super().__init__()
@@ -72,10 +70,10 @@ class Dataloader(pl.LightningDataModule):
     def tokenizing(self, dataframe):
         data = []
         for idx, item in tqdm(dataframe.iterrows(), desc='tokenizing', total=len(dataframe)):
-            # source 토큰을 문장의 어디에 붙일 것인가? 맨 앞에 붙입니다.
+            # source 토큰을 문장의 어디에 붙일 것인가? 맨 앞X뒤O에 붙입니다.
             src_tokens = [f"[{src}]" for src in item['source'].split("-")]
             # 두 입력 문장을 [SEP] 토큰으로 이어붙여서 전처리합니다.
-            text = ''.join(src_tokens) + '[SEP]'.join([item[text_column] for text_column in self.text_columns])
+            text = '[SEP]'.join([item[text_column] for text_column in self.text_columns]) + ''.join(src_tokens)
             outputs = self.tokenizer(text, add_special_tokens=True, padding='max_length', truncation=True)
             for key in outputs:
                 outputs[key] = torch.tensor(outputs[key], dtype=torch.long)

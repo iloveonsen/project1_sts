@@ -1,4 +1,4 @@
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple, Union, List
 import torch
 import torchmetrics
 import torch.nn.functional as F
@@ -7,7 +7,7 @@ import transformers
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 class Model(pl.LightningModule):
-    def __init__(self, model_name, lr):
+    def __init__(self, model_name, lr, loss_fns: List[torch.nn.Module]):
         super().__init__()
         self.save_hyperparameters()
 
@@ -24,31 +24,48 @@ class Model(pl.LightningModule):
         self.plm.resize_token_embeddings(self.plm.get_input_embeddings().num_embeddings + 5) # 야매로 5개 더 추가해줍니다.
 
         # Loss 계산을 위해 사용될 L1Loss를 호출합니다.
-        self.loss_func = torch.nn.L1Loss()
+        self.loss_fns = loss_fns
+        
 
     def forward(self, **x):
         x = self.plm(**x)['logits']
 
         return x
+    
+
+    def custom_loss(self, outputs, targets):
+        if len(self.loss_fns) == 1:
+            loss = self.loss_fns[0](outputs, targets)
+        elif len(self.loss_fns) < 1:
+            raise ValueError("At least one loss function should be defined.")
+        else:
+            loss = 0
+            for loss_fn in self.loss_fns:
+                loss += loss_fn(outputs, targets)
+            loss /= len(self.loss_fns)
+        return loss
+    
 
     def training_step(self, batch, batch_idx):
         x, y = batch
 
         logits = self(**x)
-        loss = self.loss_func(logits, y.float())
+        loss = self.custom_loss(logits, y.float())
         self.log("train_loss", loss)
 
         return loss
+    
 
     def validation_step(self, batch, batch_idx):
         x, y = batch
         logits = self(**x)
-        loss = self.loss_func(logits, y.float())
+        loss = self.custom_loss(logits, y.float())
         self.log("val_loss", loss)
 
         self.log("val_pearson", torchmetrics.functional.pearson_corrcoef(logits.squeeze(), y.squeeze()))
 
         return loss
+    
 
     def test_step(self, batch, batch_idx):
         x, y = batch
@@ -72,6 +89,7 @@ class Model(pl.LightningModule):
         logits = self(**x)
 
         return logits.squeeze()
+
 
     # training_step 이전에 호출되는 함수입니다.
     def configure_optimizers(self):

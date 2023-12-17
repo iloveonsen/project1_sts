@@ -12,6 +12,8 @@ import pandas as pd
 from tqdm.auto import tqdm
 
 import torch
+import torch.nn.functional as F
+import torchmetrics
 import pytorch_lightning as pl
 
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
@@ -25,6 +27,7 @@ from utils.utils import *
 from models.model import *
 # from models.callbacks import *
 from data.data_module import *
+from models.loss import *
 
 
 os.environ["TZ"] = "Asia/Seoul"
@@ -113,8 +116,12 @@ def main(config: Dict):
                     mode="max"
                 )
 
+                # Configure loss function
+                loss_fns = [nn.SmoothL1Loss()]
+                if len(loss_fns) > 1:
+                    print(f"Mutiple loss functions are detected. Loss functions will be summed up.")
 
-                model = Model(model_name, learning_rate)
+                model = Model(model_name, learning_rate, loss_fns)
                 # model.load_state_dict(checkpoint['state_dict'])
 
                 num_folds = args.kfold
