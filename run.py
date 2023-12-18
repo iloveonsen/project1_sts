@@ -72,6 +72,7 @@ def main(config: Dict):
     dev_path = Path(args.data_dir) / args.dev_path
     test_path = Path(args.data_dir) / args.test_path
     predict_path = Path(args.data_dir) / args.predict_path
+    
 
     if not args.inference:
         print("Start training...")
@@ -99,7 +100,7 @@ def main(config: Dict):
                 wandb_logger = WandbLogger(project=args.wandb_project_name, entity=args.wandb_username)
 
                 # model을 생성합니다.
-                early_stop_custom_callback = EarlyStopping("val_pearson", patience=5, verbose=True, mode="max")
+                early_stop_custom_callback = EarlyStopping("val_pearson", patience=6, verbose=True, mode="max")
 
                 model_provider = model_name.split("/")[0] # "klue"/roberta-large
                 dirpath = Path(args.model_dir) / model_provider
@@ -121,7 +122,7 @@ def main(config: Dict):
                 if len(loss_fns) > 1:
                     print(f"Mutiple loss functions are detected. Loss functions will be summed up.")
 
-                model = Model(model_name, learning_rate, loss_fns)
+                model = RegressionModel(model_name, learning_rate, loss_fns)
                 # model.load_state_dict(checkpoint['state_dict'])
 
                 num_folds = args.kfold
@@ -190,7 +191,7 @@ def main(config: Dict):
 
         trainer = pl.Trainer(accelerator="gpu", 
                              devices=1, max_epochs=1)
-        model = Model.load_from_checkpoint(select_version_path)
+        model = RegressionModel.load_from_checkpoint(select_version_path)
 
         output_dir = Path(args.output_dir) if not args.test else Path(args.test_output_dir)
         model_provider = model_name.split("/")[0] # "klue"/roberta-large

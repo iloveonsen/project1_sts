@@ -1,5 +1,5 @@
 {
-    "seed": 0,
+    "seed": 8080,
     "inference": false,
     "best": false,
     "test": false,
