@@ -77,7 +77,7 @@ class Dataloader(pl.LightningDataModule):
             sentence_2 = src_tokens[1] + item[self.text_columns[1]]
             text = sentence_1 + '[SEP]' + sentence_2
             # text = '[SEP]'.join([item[text_column] for text_column in self.text_columns]) + ''.join(src_tokens)
-            outputs = self.tokenizer(text, add_special_tokens=True, padding='max_length', truncation=True)
+            outputs = self.tokenizer(text, add_special_tokens=True, padding='max_length', truncation=True, max_length=150)
             for key in outputs:
                 outputs[key] = torch.tensor(outputs[key], dtype=torch.long)
                 
@@ -229,6 +229,120 @@ class KFoldDataloader(pl.LightningDataModule):
 
             self.train_dataset = Subset(total_dataset, train_idx)
             self.val_dataset = Subset(total_dataset, val_idx)
+        else:
+            # 평가데이터 준비
+            test_data = pd.read_csv(self.test_path)
+            test_inputs, test_targets = self.preprocessing(test_data)
+            self.test_dataset = Dataset(test_inputs, test_targets)
+
+            predict_data = pd.read_csv(self.predict_path)
+            predict_inputs, _ = self.preprocessing(predict_data) # predict inputs, predict targets
+            self.predict_dataset = Dataset(predict_inputs, [])
+
+    def train_dataloader(self):
+        return torch.utils.data.DataLoader(self.train_dataset, batch_size=self.batch_size, shuffle=self.shuffle)
+
+    def val_dataloader(self):
+        return torch.utils.data.DataLoader(self.val_dataset, batch_size=self.batch_size)
+
+    def test_dataloader(self):
+        return torch.utils.data.DataLoader(self.test_dataset, batch_size=self.batch_size)
+
+    def predict_dataloader(self):
+        return torch.utils.data.DataLoader(self.predict_dataset, batch_size=self.batch_size)
+    
+
+
+
+class FinaleDataloader(pl.LightningDataModule):
+    def __init__(self, model_name, batch_size, shuffle, train_path, dev_path, test_path, predict_path):
+        super().__init__()
+        self.model_name = model_name
+        self.batch_size = batch_size
+        self.shuffle = shuffle
+
+
+        self.train_path = train_path
+        self.dev_path = dev_path
+        self.test_path = test_path
+        self.predict_path = predict_path
+
+        self.train_dataset = None
+        self.val_dataset = None
+        self.test_dataset = None
+        self.predict_dataset = None
+
+        self.tokenizer = transformers.AutoTokenizer.from_pretrained(model_name, max_length=160)
+
+        # source에 해당하는 special token
+        # secial token 를 추가할때마다 model.py 의 self.plm.resize_token_embeddings(self.plm.get_input_embeddings().num_embeddings + {5}) 를 수정해줘야함
+        special_tokens_dict = {
+            "additional_special_tokens": [
+                "[petition]",
+                "[nsmc]",
+                "[slack]",
+                "[sampled]",
+                "[rtt]",
+            ]
+        }
+
+        self.tokenizer.add_special_tokens(special_tokens_dict)
+        # self.len_vocab=len(self.tokenizer) # 토큰의 갯수를 증가한만큼 update
+
+        self.target_columns = ['label']
+        self.delete_columns = ['id']
+        self.text_columns = ['sentence_1', 'sentence_2']
+
+    def tokenizing(self, dataframe):
+        data = []
+        for idx, item in tqdm(dataframe.iterrows(), desc='tokenizing', total=len(dataframe)):
+            # source 토큰을 문장의 어디에 붙일 것인가? 맨 앞X뒤O에 붙입니다.
+            src_tokens = [f"[{src}]" for src in item['source'].split("-")]
+            # 두 입력 문장을 [SEP] 토큰으로 이어붙여서 전처리합니다.
+            sentence_1 = src_tokens[0] + item[self.text_columns[0]]
+            sentence_2 = src_tokens[1] + item[self.text_columns[1]]
+            text = sentence_1 + '[SEP]' + sentence_2
+            # text = '[SEP]'.join([item[text_column] for text_column in self.text_columns]) + ''.join(src_tokens)
+            outputs = self.tokenizer(text, add_special_tokens=True, padding='max_length', truncation=True, max_length=150)
+            for key in outputs:
+                outputs[key] = torch.tensor(outputs[key], dtype=torch.long)
+                
+            data.append(outputs)
+        return data
+
+
+    def preprocessing(self, data):
+        # 안쓰는 컬럼을 삭제합니다.
+        data = data.drop(columns=self.delete_columns)
+
+        # 타겟 데이터가 없으면 빈 배열을 리턴합니다.
+        try:
+            targets = data[self.target_columns].values.tolist()
+        except:
+            targets = []
+        # 텍스트 데이터를 전처리합니다.
+        inputs = self.tokenizing(data)
+
+        return inputs, targets
+
+    def setup(self, stage='fit'):
+        if stage == 'fit':
+            # 학습 데이터와 검증 데이터셋을 호출합니다
+            train_data = pd.read_csv(self.train_path)
+            val_data = pd.read_csv(self.dev_path)
+
+            # for finale training
+            train_data = pd.concat([train_data, val_data], axis=0).reset_index(drop=True)
+
+            # 학습데이터 준비
+            train_inputs, train_targets = self.preprocessing(train_data)
+
+            # 검증데이터 준비 # validation dataset no longer needed
+            val_inputs, val_targets = self.preprocessing(val_data)
+
+            # train 데이터만 shuffle을 적용해줍니다, 필요하다면 val, test 데이터에도 shuffle을 적용할 수 있습니다
+            self.train_dataset = Dataset(train_inputs, train_targets)
+            self.val_dataset = Dataset(val_inputs, val_targets)
         else:
             # 평가데이터 준비
             test_data = pd.read_csv(self.test_path)

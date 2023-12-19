@@ -64,8 +64,9 @@ def plot_models(model_names: List[str], model_results: torch.Tensor, origin_path
         raise ValueError(f"The number of model names {len(model_names)} and model results {len(model_results)} should be the same.")
 
     # Setting up the figure with 2 rows and 5 columns
-    nrows =  len(model_names)//2 if len(model_names) % 2 == 0 else len(model_names)//2 + 1
-    fig, axes = plt.subplots(nrows=nrows, ncols=2, figsize=(5*nrows, 5*2))
+    ncols = 2
+    nrows = (len(model_names)+1)//2 if (len(model_names)+1) % 2 == 0 else (len(model_names)+1)//2 + 1
+    fig, axes = plt.subplots(ncols=ncols, nrows=nrows, figsize=(5*ncols, 5*nrows))
 
     origin_df = pd.read_csv(origin_path)
     origin_target_values = torch.tensor(origin_df[origin_target_name].values)
@@ -106,6 +107,7 @@ def plot_models(model_names: List[str], model_results: torch.Tensor, origin_path
         axes[i].set_title(f"Name: {model_name}\nBatch size: {batch_size}\nMetric: {metric:.3f}\nError count: {error_count}")
         axes[i].set_xlabel("Origin target values")
         axes[i].set_ylabel("Model result")
+        # axes[i].set_aspect('equal', adjustable='box')
 
         # Customizing plot appearance
         axes[i].spines['top'].set_visible(False)

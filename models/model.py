@@ -5,7 +5,7 @@ import torchmetrics
 import torch.nn.functional as F
 import pytorch_lightning as pl
 import transformers
-from torch.optim.lr_scheduler import ReduceLROnPlateau
+from torch.optim.lr_scheduler import LambdaLR, ReduceLROnPlateau
 
 class Model(pl.LightningModule):
     def __init__(self, model_name, lr, loss_fns: List[torch.nn.Module]):
@@ -208,6 +208,26 @@ class RegressionModel(pl.LightningModule):
         logits = self(**x)
 
         return logits.squeeze()
+    
+
+    # def configure_optimizers(self):
+    #     optimizer = torch.optim.Adam(self.parameters(), lr=0.001)
+
+    #     warm_up_scheduler = LambdaLR(optimizer, lr_lambda=lambda epoch: min((epoch + 1) / warm_up_epochs, 1.0))
+    #     reduce_on_plateau_scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=10)
+
+    #     return [{
+    #         'optimizer': optimizer,
+    #         'lr_scheduler': {
+    #             'scheduler': warm_up_scheduler,
+    #             'interval': 'step',
+    #         }
+    #     }, {
+    #         'scheduler': reduce_on_plateau_scheduler,
+    #         'interval': 'epoch',
+    #         'frequency': 1,
+    #         'monitor': 'val_loss',
+    #     }]
 
 
     # training_step 이전에 호출되는 함수입니다.
@@ -221,4 +241,5 @@ class RegressionModel(pl.LightningModule):
             'interval': 'epoch',
             'frequency': 1
         }
+
         return [optimizer], [lr_scheduler]
