@@ -3,6 +3,7 @@
     "inference": false,
     "best": false,
     "test": false,
+    "ensemble": false,
     "wandb_project_name": "nlp-project1",
     "wandb_username": "jayhwang-cloud",
     "model_name": ["snunlp/KR-ELECTRA-discriminator"],

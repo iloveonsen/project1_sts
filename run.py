@@ -32,6 +32,7 @@ from models.loss import *
 
 os.environ["TZ"] = "Asia/Seoul"
 
+
 def main(config: Dict):
     # seed 고정
     torch.manual_seed(config["seed"])
@@ -46,6 +47,7 @@ def main(config: Dict):
     parser.add_argument('--inference', default=config["inference"], action="store_true")
     parser.add_argument('--best', default=config["best"], action="store_true") # https://stackoverflow.com/questions/44561722/why-in-argparse-a-true-is-always-true
     parser.add_argument('--test', default=config["test"], action="store_true")
+    parser.add_argument('--ensemble', default=config["ensemble"], action="store_true")
     parser.add_argument('--resume', default=config["resume"], action="store_true")
     parser.add_argument('--shuffle', default=config["shuffle"], action="store_true")
     parser.add_argument('--wandb_project_name', default=config["wandb_project_name"], type=str)
@@ -72,9 +74,9 @@ def main(config: Dict):
     dev_path = Path(args.data_dir) / args.dev_path
     test_path = Path(args.data_dir) / args.test_path
     predict_path = Path(args.data_dir) / args.predict_path
-    
 
-    if not args.inference:
+
+    def train():
         print("Start training...")
 
         if len(args.model_name) != len(args.model_detail):
@@ -172,7 +174,8 @@ def main(config: Dict):
                 # 학습이 완료된 모델을 저장합니다.
                 torch.save(model, dirpath / f"{save_name}.pt")
 
-    else:
+        
+    def inference():
         print("Start inference...")
         if len(args.model_name) > 1:
             print("Multiple models are detected. Only the first model will be used for inference.")
@@ -220,6 +223,81 @@ def main(config: Dict):
             output["target"] = predictions
             output_file_name = '_'.join(select_version_path.stem.split("_")[:-2]) + f"_{datetime.today().strftime('%Y%m%d_%H%M%S')}.csv" # add prediction time
         output.to_csv(output_path / output_file_name, index=False)
+    
+
+    def ensemble():
+        print("Create ensemble result...")
+        ensemble_dir = Path("./ensembles")
+        if not ensemble_dir.exists():
+            raise ValueError("Ensemble directory does not exist.")
+        model_paths = list(ensemble_dir.glob("*/*.ckpt"))
+        if len(model_paths) < 2:
+            raise ValueError("At least two models are required for ensemble.")
+        print(f"Total {len(model_paths)} models are detected...")
+        
+        output_dir = Path(args.test_output_dir) if args.test else Path(args.output_dir)
+        output_path = output_dir / "ensemble"
+        output_path.mkdir(parents=True, exist_ok=True)
+
+        ensemble_names = []
+        model_predictions = []
+        for i, model_path in enumerate(model_paths):
+            model_name = "/".join([model_path.parent.name, model_path.stem.split("_")[0]])
+            model_metric = float(model_path.stem.split("_")[-3])
+            batch_size = int(model_path.stem.split("_")[-8])
+            ensemble_names.append("_".join([str(i), model_name.split("/")[1], str(model_metric), str(batch_size)]))
+            print(f"Processing {i}th model: {model_name}...")
+
+            if args.test:
+                print(f"\nEnsemble on test dataset {test_path}...")
+                dataloader = Dataloader(model_name, batch_size, False, train_path, dev_path, test_path, test_path)
+            else:
+                print(f"\nEnsemble for submission {predict_path}...")
+                dataloader = Dataloader(model_name, batch_size, False, train_path, dev_path, test_path, predict_path)
+            
+            trainer = pl.Trainer(accelerator="gpu", devices=1, max_epochs=1)
+            model = RegressionModel.load_from_checkpoint(model_path)
+
+            predictions = trainer.predict(model=model, datamodule=dataloader)
+            # predictions = list(val.item() for val in torch.cat(predictions))
+            predictions = torch.cat(predictions).squeeze() # take off batch dimension
+            model_predictions.append(predictions)
+
+        # voting using softmax
+        model_predictions = torch.stack(model_predictions, dim=0)
+        model_scores = torch.nn.functional.softmax(model_predictions, dim=0)
+        # print(f"Model predictions: {model_predictions.shape}, Model scores: {model_scores.shape}")
+        assert model_predictions.shape == model_scores.shape
+        # adopt score as weith
+        model_results = model_predictions * model_scores # element-wise (weighted sum)
+        model_results = model_results.sum(dim=0)
+        # dealing with out-of-range values
+        model_results = torch.where(model_results<0, 0, model_results)
+        model_results = torch.where(model_results>5, 5, model_results)
+
+        if args.test:
+            ensemble_names.append(f"{len(model_paths)}_Ensemble_0.000_00")
+            #  Plot results
+            plot_models(ensemble_names, torch.cat((model_predictions, model_results.unsqueeze(0)), dim=0), test_path, "label", error_gap=1.5)
+            # Aggregate batch outputs into one
+            output = pd.read_csv(test_path)
+            output["predict"] = model_results
+            output = output.drop(columns=["binary-label"])
+            metric = torchmetrics.functional.pearson_corrcoef(torch.tensor(output["predict"]), torch.tensor(output["label"]))
+            output_file_name = "_".join(ensemble_names) + f"_{metric:.3f}_{datetime.today().strftime('%Y%m%d_%H%M%S')}.csv"
+        else:
+            output = pd.read_csv("./data/sample_submission.csv")
+            output["target"] = predictions
+            output_file_name = "_".join(ensemble_names) + f"_{datetime.today().strftime('%Y%m%d_%H%M%S')}.csv"
+        output.to_csv(output_path / output_file_name, index=False)
+
+    if args.inference:
+        if args.ensemble:
+            ensemble()
+        else:
+            inference()
+    else:
+        train()
 
 
 if __name__ == '__main__':

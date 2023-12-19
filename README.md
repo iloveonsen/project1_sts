@@ -39,6 +39,7 @@
 - `kfold` 값을 1보다 크게 설정한 경우 cross-validation 으로 학습합니다.
   - 이때 각 fold 당 학습횟수는 `max_epoch // kfold` 입니다.
 
+
 ### Manual
 
 #### Training
@@ -74,6 +75,35 @@
 - `data` 폴더 내부의 `sample_submission.py` 에서 input 을 읽어오며,
 - 형태는 `{위의 모델 체크포인트 이름}.csv` 의 형태로 저장됩니다.
 
+#### Ensemble
+
+> `python --inference --ensemble {--test}`
+
+앙상블을 하기위해서는 미리 `./ensembles` 디렉토리를 준비해주셔야합니다.
+- 디렉토리를 만드신후 앙상블 하고 싶으신 모델 체크포인트를 직접 모델제작자 (snunlp, klue etc.) 폴더 내에 복사해 주세요.
+
+폴더 구조
+- ensembles
+  - 모델제작자
+    - 모델이름.ckpt
+  - snunlp
+    - KR-ELECTRA-discriminator-... .ckpt
+  - klue
+    - roberta-large-... .ckpt
+
+
+방식
+- `--test` 일 경우, test dataset 을 불러와서 `ensembles` 내에 저장된 각각의 모델을 불러와서 예측값을 계산합니다.
+  - 모델별 예측결과를 concat후 softmax 를 거쳐 가중합을 계산합니다.
+  - test dataset 에 GT 와 각 모델 별 + 앙상블 결과를 각각 비교하여 evaluation metric 값을 계산하고, 산점도를 출력합니다.
+    - 산점도는 `./plots` 폴더가 자동 생성되며 내부에 `plot_models_{생성일자}_{생성시간}.png` 형태로 저장됩니다.
+    - 예시 plot
+      <img src="./assets/plot_models_20231219_074631.png" width="600px" height="600px"/>
+
+  - 계산된 결과는 `./test_output` 에 `ensemble` 폴더 내부에 저장 됩니다. (기존의 모델 저자 폴더 e.g. `snunlp`, `klue` etc.)
+
+- `--test` 를 하지 않으실경우 기존 inference 와 동일하게 prediction data 를 읽어와서 각 row 에맞는 예측값을 계산하여, concat 한 후, `./output` 의 `ensemble` 폴더 내부에  `csv` 형태로 저장합니다.
+
 
 ### Update
 
@@ -81,8 +111,16 @@
 
 - 일부 boolean argument 에 대한 적용방법이 변경되었습니다. 기존 `--inference=true` 에서 `--inference` 로 바뀌었습니다.
 
-- `--best` args 를 추가하여 최신버전으로 inference 할수 있도록 하였습니다.
+- `--best` args 를 추가하여 최고성능 체크포인트를 기준으로 inference 할수 있도록 하였습니다.
 
 - `KFoldDataloader` 에도 additional token 이 추가되었습니다.
 
 - 추가 토큰에 대해, 이제는 `Model` 내부에서 직접 vocab 크기를 바꿔줘야 합니다.
+
+#### 2023-12-19
+
+- Ensemble 기능 업데이트 되었습니다.
+
+- `python run.py --inference --ensemble {--test}`
+
+- Ensemble 할때 error 에 대한 자동 plotting 기능도 추가되었습니다.

@@ -1,5 +1,13 @@
 import json
 from pathlib import Path
+from typing import List
+import matplotlib.pyplot as plt
+import seaborn as sns
+import pandas as pd
+import numpy as np
+import torch
+import torchmetrics
+from datetime import datetime
 
 def read_json(file_path):
     with open(file_path, 'r') as f:
@@ -49,6 +57,67 @@ def get_version(model_dir, model_name, best=False):
                 version, version_perf, version_path = sorted(model_versions, key=func, reverse=True)[0]
                 break
     return version, version_perf, version_path
+
+
+def plot_models(model_names: List[str], model_results: torch.Tensor, origin_path:Path, origin_target_name: str, error_gap: float = 0.5):
+    if len(model_names) != len(model_results):
+        raise ValueError(f"The number of model names {len(model_names)} and model results {len(model_results)} should be the same.")
+
+    # Setting up the figure with 2 rows and 5 columns
+    nrows =  len(model_names)//2 if len(model_names) % 2 == 0 else len(model_names)//2 + 1
+    fig, axes = plt.subplots(nrows=nrows, ncols=2, figsize=(5*nrows, 5*2))
+
+    origin_df = pd.read_csv(origin_path)
+    origin_target_values = torch.tensor(origin_df[origin_target_name].values)
+
+    # Flattening the axes array for easy iteration
+    axes = axes.flatten()
+
+    error_count = 0
+    # Looping over each model and plotting
+    for i, (model_name, model_result) in enumerate(zip(model_names, model_results)):
+        # {i}_{model_name}_{model_metric}_{batch_size}
+        idx, model_name, _, batch_size = model_name.split("_")
+        if int(i) != int(idx):
+            raise ValueError(f"The index of model name {i} and model result {idx} should be the same.")
+
+        if origin_target_values.shape != model_result.shape:
+            raise ValueError("The shape of origin target values and model result should be the same.")
+        metric = torchmetrics.functional.pearson_corrcoef(origin_target_values, model_result)
+        # get abosulte error
+        error = torch.abs(origin_target_values - model_result)
+        error_gap_mask = torch.where(error >= error_gap, 1, 0) # error gap 이상이면 1, 아니면 0
+        error_count = error_gap_mask.sum().item()
+        error_gap_color = ['red' if e.item() == 1 else 'blue' for e in error_gap_mask]
+        # masked_error = torch.masked_select(error, error_gap_mask.bool()) # remove out all False values
+
+        # Scatter plot for error_df
+        sns.scatterplot(x=origin_target_values, y=model_result, color=error_gap_color, alpha=0.5, ax=axes[i])
+        # Adding text labels for error_df
+        for error_gap_idx in error_gap_mask.nonzero().flatten():
+            axes[i].text(origin_target_values[error_gap_idx], model_result[error_gap_idx] + 0.1, error_gap_idx.item(), fontsize=8)
+
+        # Reference line y=x
+        sns.lineplot(x=[0, 5], y=[0, 5], color='black', ax=axes[i])
+
+        # Set plot limits and title
+        axes[i].set_xlim(-0.1, 5.5)
+        axes[i].set_ylim(-0.1, 5.5)
+        axes[i].set_title(f"Name: {model_name}\nBatch size: {batch_size}\nMetric: {metric:.3f}\nError count: {error_count}")
+        axes[i].set_xlabel("Origin target values")
+        axes[i].set_ylabel("Model result")
+
+        # Customizing plot appearance
+        axes[i].spines['top'].set_visible(False)
+        axes[i].spines['right'].set_visible(False)
+
+        # Adding a legend
+        # axes[i].legend(['y=x'])
+
+    # Adjust layout to minimize spaces between plots
+    fig.suptitle(f"Test model comparison\nError threshold: {error_gap}", fontsize=16)
+    plt.tight_layout()
+    plt.savefig(f"./plots/plot_models_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png")
 
 
 def format_pearson(pearson_value):

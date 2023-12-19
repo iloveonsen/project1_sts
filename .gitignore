@@ -13,6 +13,9 @@ saves/*
 outputs/*
 test_outputs/*
 bak/*
+ensembles/*
+plots/*
+
 
 # Additional
 .bash_history
