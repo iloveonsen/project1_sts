@@ -117,6 +117,8 @@ def plot_models(model_names: List[str], model_results: torch.Tensor, origin_path
     # Adjust layout to minimize spaces between plots
     fig.suptitle(f"Test model comparison\nError threshold: {error_gap}", fontsize=16)
     plt.tight_layout()
+    plot_dir = Path("./plots")
+    plot_dir.mkdir(exist_ok=True)
     plt.savefig(f"./plots/plot_models_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png")
 
 
