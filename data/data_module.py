@@ -73,11 +73,11 @@ class Dataloader(pl.LightningDataModule):
             # source 토큰을 문장의 어디에 붙일 것인가? 맨 앞X뒤O에 붙입니다.
             src_tokens = [f"[{src}]" for src in item['source'].split("-")]
             # 두 입력 문장을 [SEP] 토큰으로 이어붙여서 전처리합니다.
-            sentence_1 = src_tokens[0] + item[self.text_columns[0]]
-            sentence_2 = src_tokens[1] + item[self.text_columns[1]]
-            text = sentence_1 + '[SEP]' + sentence_2
-            # text = '[SEP]'.join([item[text_column] for text_column in self.text_columns]) + ''.join(src_tokens)
-            outputs = self.tokenizer(text, add_special_tokens=True, padding='max_length', truncation=True, max_length=150)
+            # sentence_1 = src_tokens[0] + item[self.text_columns[0]]
+            # sentence_2 = src_tokens[1] + item[self.text_columns[1]]
+            # text = sentence_1 + '[SEP]' + sentence_2
+            text = ''.join(src_tokens) + '[SEP]'.join([item[text_column] for text_column in self.text_columns])
+            outputs = self.tokenizer(text, add_special_tokens=True, padding='max_length', truncation=True, max_length=160)
             for key in outputs:
                 outputs[key] = torch.tensor(outputs[key], dtype=torch.long)
                 

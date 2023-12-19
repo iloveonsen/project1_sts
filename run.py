@@ -28,6 +28,7 @@ from models.model import *
 # from models.callbacks import *
 from data.data_module import *
 from models.loss import *
+from models.callbacks import *
 
 
 os.environ["TZ"] = "Asia/Seoul"
@@ -102,7 +103,7 @@ def main(config: Dict):
                 wandb_logger = WandbLogger(project=args.wandb_project_name, entity=args.wandb_username)
 
                 # model을 생성합니다.
-                early_stop_custom_callback = EarlyStopping("val_pearson", patience=6, verbose=True, mode="max")
+                early_stop_custom_callback = EarlyStopping("val_loss", patience=5, verbose=True, mode="max")
 
                 model_provider = model_name.split("/")[0] # "klue"/roberta-large
                 dirpath = Path(args.model_dir) / model_provider
@@ -124,7 +125,7 @@ def main(config: Dict):
                 if len(loss_fns) > 1:
                     print(f"Mutiple loss functions are detected. Loss functions will be summed up.")
 
-                model = RegressionModel(model_name, learning_rate, loss_fns)
+                model = SpecialTokenRegressionModel(model_name, learning_rate, loss_fns)
                 # model.load_state_dict(checkpoint['state_dict'])
 
                 num_folds = args.kfold
@@ -142,7 +143,7 @@ def main(config: Dict):
                         kfdataloader.setup()
 
                         trainer = pl.Trainer(accelerator="gpu", devices=1, max_epochs=max_epoch//num_folds, 
-                                             callbacks=[checkpoint_callback,early_stop_custom_callback],
+                                             callbacks=[checkpoint_callback],
                                              log_every_n_steps=1,logger=wandb_logger)
 
                         trainer.fit(model=model, datamodule=kfdataloader)
@@ -194,7 +195,7 @@ def main(config: Dict):
 
         trainer = pl.Trainer(accelerator="gpu", 
                              devices=1, max_epochs=1)
-        model = RegressionModel.load_from_checkpoint(select_version_path)
+        model = SpecialTokenRegressionModel.load_from_checkpoint(select_version_path)
 
         output_dir = Path(args.output_dir) if not args.test else Path(args.test_output_dir)
         model_provider = model_name.split("/")[0] # "klue"/roberta-large
@@ -256,7 +257,7 @@ def main(config: Dict):
                 dataloader = Dataloader(model_name, batch_size, False, train_path, dev_path, test_path, predict_path)
             
             trainer = pl.Trainer(accelerator="gpu", devices=1, max_epochs=1)
-            model = RegressionModel.load_from_checkpoint(model_path)
+            model = SpecialTokenRegressionModel.load_from_checkpoint(model_path)
 
             predictions = trainer.predict(model=model, datamodule=dataloader)
             # predictions = list(val.item() for val in torch.cat(predictions))

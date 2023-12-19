@@ -15,6 +15,7 @@ test_outputs/*
 bak/*
 ensembles/*
 plots/*
+ensembles_bak/*
 
 
 # Additional

@@ -66,6 +66,7 @@ def plot_models(model_names: List[str], model_results: torch.Tensor, origin_path
     # Setting up the figure with 2 rows and 5 columns
     ncols = 2
     nrows = (len(model_names)+1)//2 if (len(model_names)+1) % 2 == 0 else (len(model_names)+1)//2 + 1
+    print(f"ncols: {ncols}, nrows: {nrows}")
     fig, axes = plt.subplots(ncols=ncols, nrows=nrows, figsize=(5*ncols, 5*nrows))
 
     origin_df = pd.read_csv(origin_path)
