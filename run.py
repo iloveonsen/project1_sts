@@ -103,21 +103,29 @@ def main(config: Dict):
                 wandb_logger = WandbLogger(project=args.wandb_project_name, entity=args.wandb_username)
 
                 # model을 생성합니다.
-                early_stop_custom_callback = EarlyStopping("val_loss", patience=5, verbose=True, mode="max")
+                early_stop_callback = CustomEarlyStoppingCallback(patience=5, common=True, verbose=True)
 
                 model_provider = model_name.split("/")[0] # "klue"/roberta-large
                 dirpath = Path(args.model_dir) / model_provider
                 dirpath.mkdir(parents=True, exist_ok=True)
 
-                checkpoint_callback = ModelCheckpoint(
-                    monitor="val_pearson",
-                    save_top_k=1,
+                # checkpoint_callback = ModelCheckpoint(
+                #     monitor="val_pearson",
+                #     save_top_k=1,
+                #     dirpath=dirpath,
+                #     filename=save_name + "_{epoch:03d}_{step:05d}_" + "{val_pearson:0.3f}" + "_" + datetime.today().strftime("%Y%m%d_%H%M%S"),
+                #     auto_insert_metric_name=False,
+                #     save_weights_only=False,
+                #     verbose=True,
+                #     mode="max"
+                # )
+
+                checkpoint_callback = CustomCheckpointCallback(
                     dirpath=dirpath,
-                    filename=save_name + "_{epoch:03d}_{step:05d}_" + "{val_pearson:0.3f}" + "_" + datetime.today().strftime("%Y%m%d_%H%M%S"),
-                    auto_insert_metric_name=False,
-                    save_weights_only=False,
+                    save_name=save_name,
                     verbose=True,
-                    mode="max"
+                    min_delta=0.0,
+                    save_top_k=1,
                 )
 
                 # Configure loss function
@@ -165,7 +173,7 @@ def main(config: Dict):
 
                     # gpu가 없으면 accelerator="cpu"로 변경해주세요, gpu가 여러개면 'devices=4'처럼 사용하실 gpu의 개수를 입력해주세요
                     trainer = pl.Trainer(accelerator="gpu", devices=1, max_epochs=max_epoch, 
-                                         callbacks=[checkpoint_callback,early_stop_custom_callback],
+                                         callbacks=[checkpoint_callback,early_stop_callback],
                                          log_every_n_steps=1,logger=wandb_logger)
 
                     # Train part
@@ -218,7 +226,7 @@ def main(config: Dict):
             print(f"\nInference for submission {predict_path}...")
             dataloader = Dataloader(model_name, batch_size, False, train_path, dev_path, test_path, predict_path)
             predictions = trainer.predict(model=model, datamodule=dataloader)
-            predictions = list(round(val.item(), 1) for val in torch.cat(predictions)) # (# batches, batch_size * 1) -> (# batches * batch_size * 1)
+            predictions = list(round(val.item(), 2) for val in torch.cat(predictions)) # (# batches, batch_size * 1) -> (# batches * batch_size * 1)
             
             output = pd.read_csv("./data/sample_submission.csv")
             output["target"] = predictions

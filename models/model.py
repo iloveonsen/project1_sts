@@ -90,20 +90,32 @@ class Model(pl.LightningModule):
         logits = self(**x)
 
         return logits.squeeze()
+    
+    # # training_step 이전에 호출되는 함수입니다.
+    # def configure_optimizers(self):
+    #     optimizer = torch.optim.AdamW(self.parameters(), lr=self.lr)
 
+    #     return optimizer
 
     # training_step 이전에 호출되는 함수입니다.
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(self.parameters(), lr=self.lr)
 
-        # Define the LR scheduler
-        lr_scheduler = {
-            'scheduler': ReduceLROnPlateau(optimizer, mode='min', factor=0.6, patience=3, verbose=True),
-            'monitor': 'val_loss',  # Adjust this based on your validation metric
-            'interval': 'epoch',
-            'frequency': 1
-        }
-        return [optimizer], [lr_scheduler]
+        # Define the warm-up phase
+        warmup_steps = 3
+        warmup_scheduler = LambdaLR(optimizer, lr_lambda=lambda epoch: float(epoch) / warmup_steps if epoch < warmup_steps else 1)
+
+        # Define the StepLR scheduler
+        step_size = 2  # Number of epochs between each step
+        gamma = 0.9     # Multiplicative factor of learning rate decay
+        step_scheduler = StepLR(optimizer, step_size=step_size, gamma=gamma)
+
+        # Combine schedulers with SequentialLR
+        schedulers = [warmup_scheduler, step_scheduler]
+        milestones = [warmup_steps]  # The epochs at which to switch schedulers, here after warmup
+        combined_scheduler = SequentialLR(optimizer, schedulers, milestones)
+
+        return {"optimizer": optimizer, "lr_scheduler": combined_scheduler}
     
 
 # class CustomModelCheckpoint(ModelCheckpoint):
@@ -330,6 +342,13 @@ class SpecialTokenRegressionModel(pl.LightningModule):
         logits = self(**x)
 
         return logits.squeeze()
+    
+
+    # # training_step 이전에 호출되는 함수입니다.
+    # def configure_optimizers(self):
+    #     optimizer = torch.optim.AdamW(self.parameters(), lr=self.lr)
+
+    #     return optimizer
 
 
     # training_step 이전에 호출되는 함수입니다.
@@ -337,7 +356,7 @@ class SpecialTokenRegressionModel(pl.LightningModule):
         optimizer = torch.optim.AdamW(self.parameters(), lr=self.lr)
 
         # Define the warm-up phase
-        warmup_steps = 5
+        warmup_steps = 3
         warmup_scheduler = LambdaLR(optimizer, lr_lambda=lambda epoch: float(epoch) / warmup_steps if epoch < warmup_steps else 1)
 
         # Define the StepLR scheduler
