@@ -110,7 +110,7 @@
 
 `csvplot` 폴더내부의 `plots.py` 에 함수가 정의되어 있으며, `plotcsv.ipynb` 노트북 파일에서 import 해서 사용하시면 편리합니다.
 
-> def ensemble_from_test_csv(target_path, target_column, pred_dir, pred_column, plot_dir="./plots", result_dir="./results", error_gap: float = 0.5)
+> `def ensemble_from_test_csv(target_path, target_column, pred_dir, pred_column, plot_dir="./plots", result_dir="./results", error_gap: float = 0.5)`
 
 - 비교할 label이 존재한 test dataset 을 대상으로 inference 한 결과 (`python run.py --inference --test`) csv 파일들을 모아서, 앙상블을 계산합니다.
 - 각 결과에 대해 (각 모델 및 앙상블 포함) error plot (산점도) 과 label 분포 plot (히스토그램) 을 그린후 `plot_dir` 폴더 내부에 `ensemble_from_test_csv_{생성일자}_{생성시간}.png` 의 이름으로 저장합니다.
@@ -131,7 +131,7 @@
   - 모든 bin 의 간격은 0.1 로 동일합니다.
   - 히스토그램간 y 축의 범위를 공유합니다.
 
-> def ensemble_from_submission_csv(pred_dir, target_path="../data/sample_submission.csv", plot_dir="./plots", result_dir="./results"):
+> `def ensemble_from_submission_csv(pred_dir, target_path="../data/sample_submission.csv", plot_dir="./plots", result_dir="./results"):`
 
 - sample_submission.csv 를 대상으로 inference 한 결과 (`python run.py --inference`) csv 파일을 보아서 앙상블을 계산합니다.
 - 제출 파일에는 비교할 GT가 없으므로, 각 결과에 대해 (각 모델 및 앙상블 포함) label 분포 plot (히스토그램) 을 그린후 `plot_dir` 폴더 내부에 `ensemble_from_submission_csv_{생성일자}_{생성시간}.png` 의 이름으로 저장합니다.
